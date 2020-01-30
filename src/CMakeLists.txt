@@ -13,8 +13,8 @@
 #   limitations under the License.
 
 set(PROJ_WEBCFG webcfg)
-set(HEADERS webcfg.h dhcp.h envelope.h full.h firewall.h gre.h portmapping.h wifi.h xdns.h)
-set(SOURCES http_headers.c helpers.c dhcp.c envelope.c full.c firewall.c gre.c portmapping.c wifi.c xdns.c webcfg.c)
+set(HEADERS webcfg.h dhcp.h envelope.h full.h firewall.h gre.h portmapping.h webcfgparam.h webcfgdoc.h wifi.h xdns.h)
+set(SOURCES http_headers.c helpers.c dhcp.c envelope.c full.c firewall.c gre.c portmapping.c webcfgparam.c webcfgdoc.c wifi.c xdns.c webcfg.c)
 
 add_library(${PROJ_WEBCFG} STATIC ${HEADERS} ${SOURCES})
 add_library(${PROJ_WEBCFG}.shared SHARED ${HEADERS} ${SOURCES})

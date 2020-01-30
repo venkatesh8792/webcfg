@@ -87,7 +87,7 @@ int http_request( http_request_t *req, http_response_t *resp )
         curl_easy_setopt( curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2 );
 
         /* Don't perform an OCSP check as that can DDoS that endpoint. */
-        curl_easy_setopt( curl, CURLOPT_SSL_VERIFYSTATUS, 0L );
+        //curl_easy_setopt( curl, CURLOPT_SSL_VERIFYSTATUS, 0L );
 
         /* Setup response handling. */
         curl_easy_setopt( curl, CURLOPT_WRITEFUNCTION, write_cb );

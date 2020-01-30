@@ -100,6 +100,23 @@ target_link_libraries (test_portmapping -lcunit -lmsgpackc)
 target_link_libraries (test_portmapping gcov -Wl,--no-as-needed )
 
 #-------------------------------------------------------------------------------
+#   test_webcfgparam
+#-------------------------------------------------------------------------------
+add_test(NAME test_webcfgparam COMMAND ${MEMORY_CHECK} ./test_webcfgparam)
+add_executable(test_webcfgparam test_webcfgparam.c ../src/webcfgparam.c ../src/helpers.c)
+target_link_libraries (test_webcfgparam -lcunit -lmsgpackc)
+
+target_link_libraries (test_webcfgparam gcov -Wl,--no-as-needed )
+
+#-------------------------------------------------------------------------------
+#   test_webcfgdoc
+#-------------------------------------------------------------------------------
+add_test(NAME test_webcfgdoc COMMAND ${MEMORY_CHECK} ./test_webcfgdoc)
+add_executable(test_webcfgdoc test_webcfgdoc.c ../src/webcfgdoc.c ../src/webcfgparam.c ../src/helpers.c)
+target_link_libraries (test_webcfgdoc -lcunit -lmsgpackc)
+
+target_link_libraries (test_webcfgdoc gcov -Wl,--no-as-needed )
+#-------------------------------------------------------------------------------
 #   test_wifi
 #-------------------------------------------------------------------------------
 add_test(NAME test_wifi COMMAND ${MEMORY_CHECK} ./test_wifi)
