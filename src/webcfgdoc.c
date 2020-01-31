@@ -44,7 +44,7 @@ enum {
 /*----------------------------------------------------------------------------*/
 /*                             Function Prototypes                            */
 /*----------------------------------------------------------------------------*/
-int process_docparams( doc_t *e, msgpack_object_map *map );
+//int process_docparams( doc_t *e, msgpack_object_map *map );
 int process_webcfgdoc( webcfgdoc_t *pm, msgpack_object *obj );
 
 /*----------------------------------------------------------------------------*/
@@ -57,6 +57,14 @@ webcfgdoc_t* webcfgdoc_convert( const void *buf, size_t len )
     return helper_convert( buf, len, sizeof(webcfgdoc_t), "value",
                            MSGPACK_OBJECT_ARRAY, true,
                            (process_fn_t) process_webcfgdoc,
+                           (destroy_fn_t) webcfgdoc_destroy );
+}
+
+webcfgdoc_t* webcfgblob_convert( const void *buf, size_t len )
+{
+	return helper_convert_array( buf, len, sizeof(webcfgdoc_t), "value",
+                           MSGPACK_OBJECT_ARRAY, true,
+                           NULL,
                            (destroy_fn_t) webcfgdoc_destroy );
 }
 
@@ -129,12 +137,12 @@ int process_docparams( doc_t *e, msgpack_object_map *map )
             if( MSGPACK_OBJECT_POSITIVE_INTEGER == p->val.type ) {
                 if( 0 == match(p, "version") ) {
                     if( UINT16_MAX < p->val.via.u64 ) {
-			printf("e->version is %d\n", e->version);
+			//printf("e->version is %d\n", e->version);
                         errno = PM_INVALID_VERSION;
                         return -1;
                     } else {
                         e->version = (uint16_t) p->val.via.u64;
-			printf("e->version is %d\n", e->version);
+			//printf("e->version is %d\n", e->version);
                     }
                     objects_left &= ~(1 << 0);
 		    //printf("objects_left after version %d\n", objects_left);
@@ -142,13 +150,13 @@ int process_docparams( doc_t *e, msgpack_object_map *map )
             } else if( MSGPACK_OBJECT_STR == p->val.type ) {
                 if( 0 == match(p, "name") ) {
                     e->name = strndup( p->val.via.str.ptr, p->val.via.str.size );
-		    printf("e->name is %s\n", e->name);
+		    //printf("e->name is %s\n", e->name);
                     objects_left &= ~(1 << 1);
 		    //printf("objects_left after name %d\n", objects_left);
                 }
 		if( 0 == match(p, "url") ) {
                     e->url = strndup( p->val.via.str.ptr, p->val.via.str.size );
-		    printf("e->url is %s\n", e->url);
+		    //printf("e->url is %s\n", e->url);
                     objects_left &= ~(1 << 2);
 		    //printf("objects_left after url %d\n", objects_left);
                 }
@@ -162,7 +170,7 @@ int process_docparams( doc_t *e, msgpack_object_map *map )
     } else {
         errno = PM_OK;
     }
-
+	
     return (0 == objects_left) ? 0 : -1;
 }
 
@@ -183,7 +191,8 @@ int process_webcfgdoc( webcfgdoc_t *pm, msgpack_object *obj )
         memset( pm->entries, 0, sizeof(doc_t) * pm->entries_count );
 	//printf("pm->entries_count is %lu\n", pm->entries_count);
         for( i = 0; i < pm->entries_count; i++ ) {
-            if( MSGPACK_OBJECT_MAP != array->ptr[i].type ) {
+            //if( MSGPACK_OBJECT_MAP != array->ptr[i].type ) {
+	    if( MSGPACK_OBJECT_ARRAY != array->ptr[i].type ) {
                 errno = PM_INVALID_PM_OBJECT;
                 return -1;
             }

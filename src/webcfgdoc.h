@@ -18,7 +18,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
-
+#include <msgpack.h>
 typedef struct
 {
     char *name;
@@ -41,7 +41,8 @@ typedef struct {
  *  @return NULL on error, success otherwise
  */
 webcfgdoc_t* webcfgdoc_convert( const void *buf, size_t len );
-
+webcfgdoc_t* webcfgblob_convert( const void *buf, size_t len );
+int process_docparams( doc_t *e, msgpack_object_map *map );
 /**
  *  This function destroys an webcfgdoc_t object.
  *

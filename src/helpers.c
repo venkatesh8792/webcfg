@@ -18,7 +18,7 @@
 #include <msgpack.h>
 
 #include "helpers.h"
-
+#include "webcfgdoc.h"
 /*----------------------------------------------------------------------------*/
 /*                                   Macros                                   */
 /*----------------------------------------------------------------------------*/
@@ -40,6 +40,9 @@
 msgpack_object* __finder( const char *name, 
                           msgpack_object_type expect_type,
                           msgpack_object_map *map );
+msgpack_object* __finderarray( const char *name, 
+                          msgpack_object_type expect_type,
+                          msgpack_object_map *map );
 
 /*----------------------------------------------------------------------------*/
 /*                             External Functions                             */
@@ -50,6 +53,7 @@ void* helper_convert( const void *buf, size_t len,
                       process_fn_t process,
                       destroy_fn_t destroy )
 {
+	printf(">>>>inside helper_convert\n");
     void *p = malloc( struct_size );
 
     if( NULL == p ) {
@@ -66,6 +70,11 @@ void* helper_convert( const void *buf, size_t len,
 
             /* The outermost wrapper MUST be a map. */
             mp_rv = msgpack_unpack_next( &msg, (const char*) buf, len, &offset );
+	    printf("mp_rv is %d MSGPACK_UNPACK_SUCCESS %d offset %lu\n", mp_rv, MSGPACK_UNPACK_SUCCESS, offset);
+	msgpack_object obj = msg.data;
+	msgpack_object_print(stdout, obj);
+            printf("\nMSGPACK_OBJECT_MAP is %d  msg.data.type %d\n", MSGPACK_OBJECT_MAP, msg.data.type);
+
             if( (MSGPACK_UNPACK_SUCCESS == mp_rv) && (0 != offset) &&
                 (MSGPACK_OBJECT_MAP == msg.data.type) )
             {
@@ -97,6 +106,92 @@ void* helper_convert( const void *buf, size_t len,
     return p;
 }
 
+void* helper_convert_array( const void *buf, size_t len,
+                      size_t struct_size, const char *wrapper,
+                      msgpack_object_type expect_type, bool optional,
+                      process_fn_t process,
+                      destroy_fn_t destroy )
+{
+    void *p = malloc( struct_size );
+	
+    if( NULL == p ) {
+        errno = HELPERS_OUT_OF_MEMORY;
+    } else {
+        memset( p, 0, struct_size );
+
+        if( NULL != buf && 0 < len ) {
+            size_t offset = 0;
+            msgpack_unpacked msg;
+            msgpack_unpack_return mp_rv;
+
+            msgpack_unpacked_init( &msg );
+
+            /* The outermost wrapper MUST be a map. */
+            mp_rv = msgpack_unpack_next( &msg, (const char*) buf, len, &offset );
+			printf("mp_rv is %d MSGPACK_UNPACK_SUCCESS %d offset %lu\n", mp_rv, MSGPACK_UNPACK_SUCCESS, offset);
+			msgpack_object obj = msg.data;
+			msgpack_object_print(stdout, obj);
+			webcfgdoc_t *pm = NULL;
+			pm = (webcfgdoc_t *) malloc( sizeof(webcfgdoc_t) );
+
+            if( (MSGPACK_UNPACK_SUCCESS == mp_rv) && (0 != offset) &&
+                (MSGPACK_OBJECT_ARRAY == msg.data.type) )
+            {
+
+			//traverse through array and then to map
+
+			msgpack_object_array *array = &obj.via.array;
+			if( 0 < array->size ) {
+			size_t i;
+			pm->entries_count = array->size;
+			pm->entries = (doc_t *) malloc( sizeof(doc_t) * pm->entries_count );
+			if( NULL == pm->entries ) {
+			pm->entries_count = 0;
+			return p;
+		}
+		printf("\narray processing\n");
+		memset( pm->entries, 0, sizeof(doc_t) * pm->entries_count );
+		for( i = 0; i < pm->entries_count; i++ ) {
+			if( MSGPACK_OBJECT_MAP != array->ptr[i].type ) {
+			return p;
+		}
+		if( 0 != process_docparams(&pm->entries[i], &array->ptr[i].via.map) ) {
+			printf("process_docparams failed\n");
+			return p;
+			}
+			p =(void*)pm;
+			return p;
+		}
+
+		}
+                msgpack_object *inner;
+
+                inner = &msg.data;
+                if( NULL != wrapper ) {
+                    inner = __finderarray( wrapper, expect_type, &msg.data.via.map );
+                }
+
+                if( ((true == optional) && (NULL == inner)) ||
+                    ((NULL != inner) && (0 == (process)(p, inner))) )
+                {
+                    msgpack_unpacked_destroy( &msg );
+                    errno = HELPERS_OK;
+                    return p;
+                }
+            } else {
+                errno = HELPERS_INVALID_FIRST_ELEMENT;
+            }
+
+            msgpack_unpacked_destroy( &msg );
+
+            (destroy)( p );
+            p = NULL;
+        }
+    }
+	
+    return p;
+}
+
 /*----------------------------------------------------------------------------*/
 /*                             Internal functions                             */
 /*----------------------------------------------------------------------------*/
@@ -116,7 +211,25 @@ msgpack_object* __finder( const char *name,
             }
         }
     }
+    errno = HELPERS_MISSING_WRAPPER;
+    return NULL;
+}
 
+msgpack_object* __finderarray( const char *name, 
+                          msgpack_object_type expect_type,
+                          msgpack_object_map *map )
+{
+    uint32_t i;
+
+    for( i = 0; i < map->size; i++ ) {
+        if( MSGPACK_OBJECT_STR == map->ptr[i].key.type ) {
+            if( expect_type == map->ptr[i].val.type ) {
+                if( 0 == match(&(map->ptr[i]), name) ) {
+                    return &map->ptr[i].val;
+                }
+            }
+        }
+    }
     errno = HELPERS_MISSING_WRAPPER;
     return NULL;
 }

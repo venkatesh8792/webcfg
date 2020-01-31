@@ -88,7 +88,7 @@ void test_webcfgsubdoc()
 {
 	webcfgdoc_t *pm;
 	int err, len=0, i=0;
-	char subdocfile[64] = "../../tests/doc-now.bin";
+	char subdocfile[64] = "doc-now.bin";
 	char *binfileData = NULL;
 	int status = -1;
 	void* basicV; 
@@ -124,7 +124,7 @@ void test_rootdoc()
 	int err, len=0, i=0, valLen=0;
 	char *binfileData = NULL;
 	int status = -1;
-	char rootdocfile[64] = "../../tests/rootconfigdoc-now.bin";
+	char rootdocfile[64] = "doc-now.bin";
 
 	status = readFromFile(rootdocfile, &binfileData , &len);
 	printf("\n\nbinfileData is %s len %d\n", binfileData, len);
