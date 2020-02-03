@@ -17,7 +17,7 @@
 #include <string.h>
 #include <msgpack.h>
 
-#include "helpers.h"
+#include "array_helpers.h"
 #include "webcfgdoc.h"
 
 /*----------------------------------------------------------------------------*/
@@ -44,7 +44,7 @@ enum {
 /*----------------------------------------------------------------------------*/
 /*                             Function Prototypes                            */
 /*----------------------------------------------------------------------------*/
-//int process_docparams( doc_t *e, msgpack_object_map *map );
+int process_docparams( doc_t *e, msgpack_object_map *map );
 int process_webcfgdoc( webcfgdoc_t *pm, msgpack_object *obj );
 
 /*----------------------------------------------------------------------------*/
@@ -54,17 +54,8 @@ int process_webcfgdoc( webcfgdoc_t *pm, msgpack_object *obj );
 /* See webcfgdoc.h for details. */
 webcfgdoc_t* webcfgdoc_convert( const void *buf, size_t len )
 {
-    return helper_convert( buf, len, sizeof(webcfgdoc_t), "value",
-                           MSGPACK_OBJECT_ARRAY, true,
+	return helper_convert_array( buf, len, sizeof(webcfgdoc_t), true,
                            (process_fn_t) process_webcfgdoc,
-                           (destroy_fn_t) webcfgdoc_destroy );
-}
-
-webcfgdoc_t* webcfgblob_convert( const void *buf, size_t len )
-{
-	return helper_convert_array( buf, len, sizeof(webcfgdoc_t), "value",
-                           MSGPACK_OBJECT_ARRAY, true,
-                           NULL,
                            (destroy_fn_t) webcfgdoc_destroy );
 }
 
@@ -131,7 +122,6 @@ int process_docparams( doc_t *e, msgpack_object_map *map )
     msgpack_object_kv *p;
 
     p = map->ptr;
-   // printf("objects_left before while %d\n", objects_left);
     while( (0 < objects_left) && (0 < left--) ) {
         if( MSGPACK_OBJECT_STR == p->key.type ) {
             if( MSGPACK_OBJECT_POSITIVE_INTEGER == p->val.type ) {
@@ -165,7 +155,6 @@ int process_docparams( doc_t *e, msgpack_object_map *map )
         }
         p++;
     }
-
     if( 1 & objects_left ) {
     } else {
         errno = PM_OK;
@@ -177,7 +166,6 @@ int process_docparams( doc_t *e, msgpack_object_map *map )
 int process_webcfgdoc( webcfgdoc_t *pm, msgpack_object *obj )
 {
     msgpack_object_array *array = &obj->via.array;
-    //printf("array->size is %d\n", array->size);
     if( 0 < array->size ) {
         size_t i;
 
@@ -189,15 +177,13 @@ int process_webcfgdoc( webcfgdoc_t *pm, msgpack_object *obj )
         }
 
         memset( pm->entries, 0, sizeof(doc_t) * pm->entries_count );
-	//printf("pm->entries_count is %lu\n", pm->entries_count);
         for( i = 0; i < pm->entries_count; i++ ) {
-            //if( MSGPACK_OBJECT_MAP != array->ptr[i].type ) {
-	    if( MSGPACK_OBJECT_ARRAY != array->ptr[i].type ) {
+            if( MSGPACK_OBJECT_MAP != array->ptr[i].type ) {
                 errno = PM_INVALID_PM_OBJECT;
                 return -1;
             }
             if( 0 != process_docparams(&pm->entries[i], &array->ptr[i].via.map) ) {
-		//printf("process_docparams failed\n");
+		printf("process_docparams failed\n");
                 return -1;
             }
         }

@@ -20,7 +20,7 @@
 #include <CUnit/Basic.h>
 #include "../src/webcfgparam.h"
 
-#define WEB_CFG_FILE "webcfg-now100.bin"
+#define WEB_CFG_FILE "../../tests/webcfg-now100.bin"
 int readFromFile(char **data, int *len)
 {
 	FILE *fp;
@@ -28,7 +28,7 @@ int readFromFile(char **data, int *len)
 	fp = fopen(WEB_CFG_FILE, "r+");
 	if (fp == NULL)
 	{
-		printf("Failed to open file %s\n", WEB_CFG_FILE);
+		printf("Failed to open file %s. provide the file\n", WEB_CFG_FILE);
 		return 0;
 	}
 	fseek(fp, 0, SEEK_END);
@@ -38,7 +38,6 @@ int readFromFile(char **data, int *len)
 	fread(*data, 1, ch_count,fp);
         
 	*len = ch_count;
-	//printf("ch_count is %d\n", *len);
 	(*data)[ch_count] ='\0';
 	fclose(fp);
 	return 1;
@@ -47,7 +46,7 @@ int readFromFile(char **data, int *len)
 void test_basic()
 {
 
-	webcfgparam_t *pm;
+	webcfgparam_t *pm = NULL;
 	int err, len=0, i=0;
 
 	char *binfileData = NULL;
@@ -56,27 +55,30 @@ void test_basic()
 	status = readFromFile(&binfileData , &len);
 
 	printf("read status %d\n", status);
-	void* basicV;
-
-	basicV = ( void*)binfileData;
-
-	pm = webcfgparam_convert( basicV, len+1 );
-	err = errno;
-	printf( "errno: %s\n", webcfgparam_strerror(err) );
-	CU_ASSERT_FATAL( NULL != pm );
-	CU_ASSERT_FATAL( NULL != pm->entries );
-	CU_ASSERT_FATAL( 100 == pm->entries_count );
-	CU_ASSERT_STRING_EQUAL( "Device.DeviceInfo.X_RDKCENTRAL-COM_CloudUIEnable", pm->entries[0].name );
-	CU_ASSERT_STRING_EQUAL( "false", pm->entries[0].value );
-	CU_ASSERT_FATAL( 3 == pm->entries[0].type );
-	for(i = 0; i < (int)pm->entries_count ; i++)
+	if(status)
 	{
-		printf("pm->entries[%d].name %s\n", i, pm->entries[i].name);
-		printf("pm->entries[%d].value %s\n" , i, pm->entries[i].value);
-		printf("pm->entries[%d].type %d\n", i, pm->entries[i].type);
-	}
+		void* basicV;
 
-    webcfgparam_destroy( pm );
+		basicV = ( void*)binfileData;
+
+		pm = webcfgparam_convert( basicV, len+1 );
+		err = errno;
+		printf( "errno: %s\n", webcfgparam_strerror(err) );
+		CU_ASSERT_FATAL( NULL != pm );
+		CU_ASSERT_FATAL( NULL != pm->entries );
+		CU_ASSERT_FATAL( 100 == pm->entries_count );
+		CU_ASSERT_STRING_EQUAL( "Device.DeviceInfo.X_RDKCENTRAL-COM_CloudUIEnable", pm->entries[0].name );
+		CU_ASSERT_STRING_EQUAL( "false", pm->entries[0].value );
+		CU_ASSERT_FATAL( 3 == pm->entries[0].type );
+		for(i = 0; i < (int)pm->entries_count ; i++)
+		{
+			printf("pm->entries[%d].name %s\n", i, pm->entries[i].name);
+			printf("pm->entries[%d].value %s\n" , i, pm->entries[i].value);
+			printf("pm->entries[%d].type %d\n", i, pm->entries[i].type);
+		}
+
+	    	webcfgparam_destroy( pm );
+	}
 }
 
 void add_suites( CU_pSuite *suite )

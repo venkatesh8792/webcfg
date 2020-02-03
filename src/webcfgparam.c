@@ -123,18 +123,17 @@ int process_params( param_t *e, msgpack_object_map *map )
     msgpack_object_kv *p;
 
     p = map->ptr;
-    //printf("objects_left before while %d\n", objects_left);
     while( (0 < objects_left) && (0 < left--) ) {
         if( MSGPACK_OBJECT_STR == p->key.type ) {
             if( MSGPACK_OBJECT_POSITIVE_INTEGER == p->val.type ) {
                 if( 0 == match(p, "datatype") ) {
                     if( UINT16_MAX < p->val.via.u64 ) {
-			printf("e->type is %d\n", e->type);
+			//printf("e->type is %d\n", e->type);
                         errno = PM_INVALID_DATATYPE;
                         return -1;
                     } else {
                         e->type = (uint16_t) p->val.via.u64;
-			printf("e->type is %d\n", e->type);
+			//printf("e->type is %d\n", e->type);
                     }
                     objects_left &= ~(1 << 0);
 		    //printf("objects_left after datatype %d\n", objects_left);
@@ -142,13 +141,13 @@ int process_params( param_t *e, msgpack_object_map *map )
             } else if( MSGPACK_OBJECT_STR == p->val.type ) {
                 if( 0 == match(p, "name") ) {
                     e->name = strndup( p->val.via.str.ptr, p->val.via.str.size );
-		    printf("e->name is %s\n", e->name);
+		    //printf("e->name is %s\n", e->name);
                     objects_left &= ~(1 << 1);
 		    //printf("objects_left after name %d\n", objects_left);
                 }
 		if( 0 == match(p, "value") ) {
                     e->value = strndup( p->val.via.str.ptr, p->val.via.str.size );
-		    printf("e->value is %s\n", e->value);
+		    //printf("e->value is %s\n", e->value);
                     objects_left &= ~(1 << 2);
 		    //printf("objects_left after value %d\n", objects_left);
                 }

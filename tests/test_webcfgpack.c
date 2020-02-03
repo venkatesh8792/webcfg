@@ -28,15 +28,15 @@ void webcfgPackUnpack();
 	  "parameters": [
 	    {
 	      "name": "Device.X_RDK_WebConfig.RootConfig.Data",
-	      "value": "��value���name�radio�url�&$host/api/v1/device/<mac>/config/radio�version�",
+	      "value": "<blob>",
 	      "datatype": 0
 	    }
 	  ]
 	}
 ============
 	{
-	"name": "radio",
-	"url": "$host/api/v1/device/<mac>/config/radio",
+	"name": "blob",
+	"url": "http:/example.com/<mac>/blob",
 	"version": 2274
 	}
 */
@@ -89,7 +89,8 @@ int writeToFile(char *filename, char *data)
 void test_webcfgpack_unpack()
 {
 	int len=0;
-	char subdocfile[64] = "../../tests/subdoc-now.bin";
+	char subdocfile[64] = "../../tests/multiple-now.bin";
+	
 	char *binfileData = NULL;
 	int status = -1;
 	char* blobbuff = NULL; 
@@ -163,20 +164,37 @@ void webcfgPackUnpack(char *blob)
 				printf("pm->entries[%d].type %d\n", i, pm->entries[i].type);
 			}
 
-
 			//decode inner blob
 			webcfgdoc_t *rpm;
 			printf("--------------decode blob-------------\n");
-			rpm = webcfgblob_convert( pm->entries[0].value, strlen(pm->entries[0].value) );
+			rpm = webcfgdoc_convert( pm->entries[0].value, strlen(pm->entries[0].value) );
 			printf("blob len %lu\n", strlen(pm->entries[0].value));
 			err = errno;
 			printf( "errno: %s\n", webcfgdoc_strerror(err) );
 			CU_ASSERT_FATAL( NULL != rpm );
 			CU_ASSERT_FATAL( NULL != rpm->entries );
-			CU_ASSERT_FATAL( 1 == rpm->entries_count );
-			CU_ASSERT_STRING_EQUAL( "radio", rpm->entries[0].name );
-			CU_ASSERT_STRING_EQUAL( "https://cpe-config.xpc.net:8080/api/v1/device/14cfe2142145/config/radio", rpm->entries[0].url );
+			CU_ASSERT_FATAL( 4 == rpm->entries_count );
+			
+			//first blob
+			CU_ASSERT_STRING_EQUAL( "blob1", rpm->entries[0].name );
+			CU_ASSERT_STRING_EQUAL( "http://example.com/mac:112233445566/blob1", rpm->entries[0].url );
 			CU_ASSERT_FATAL( 1234 == rpm->entries[0].version );
+
+			//second blob
+			CU_ASSERT_STRING_EQUAL( "blob2", rpm->entries[1].name );
+			CU_ASSERT_STRING_EQUAL( "http:/example.com/<mac>/blob2", rpm->entries[1].url );
+			CU_ASSERT_FATAL( 3366 == rpm->entries[1].version );
+
+			//third blob
+			CU_ASSERT_STRING_EQUAL( "blob3", rpm->entries[2].name );
+			CU_ASSERT_STRING_EQUAL( "$host/example.com/<mac>/blob3", rpm->entries[2].url );
+			CU_ASSERT_FATAL( 1357 == rpm->entries[2].version );
+
+			//fourth blob
+			CU_ASSERT_STRING_EQUAL( "blob4", rpm->entries[3].name );
+			CU_ASSERT_STRING_EQUAL( "$host/example.com<mac>/blob4", rpm->entries[3].url );
+			CU_ASSERT_FATAL( 65535 == rpm->entries[3].version );
+
 			for(i = 0; i < (int)rpm->entries_count ; i++)
 			{
 				printf("rpm->entries[%d].name %s\n", i, rpm->entries[i].name);

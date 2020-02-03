@@ -21,24 +21,6 @@
 #include "../src/webcfgdoc.h"
 #include "../src/webcfgparam.h"
 
-/*
-	{
-	  "parameters": [
-	    {
-	      "name": "Device.X_RDK_WebConfig.RootConfig.Data",
-	      "value": "��value���name�radio�url�&$host/api/v1/device/<mac>/config/radio�version�",
-	      "datatype": 0
-	    }
-	  ]
-	}
-============
-	{
-	"name": "radio",
-	"url": "$host/api/v1/device/<mac>/config/radio",
-	"version": 2274
-	}
-*/
-
 int readFromFile(char *filename, char **data, int *len)
 {
 	FILE *fp;
@@ -83,39 +65,56 @@ int writeToFile(char *filename, char *data)
 	}
 }
 
-
+/* blob with 2 subdocs */
+/*
+[
+  {
+    "name": "blob1",
+    "url": "http:/example.com/<mac>/blob1",
+    "version": 1234
+  },
+  {
+    "name": "blob2",
+    "url": "http:/example.com/<mac>/blob2",
+    "version": 65535
+  }
+]
+*/
 void test_webcfgsubdoc()
 {
 	webcfgdoc_t *pm;
 	int err, len=0, i=0;
-	char subdocfile[64] = "doc-now.bin";
+	char subdocfile[64] = "../../tests/doc-now.bin";
 	char *binfileData = NULL;
 	int status = -1;
 	void* basicV; 
 
 	status = readFromFile(subdocfile , &binfileData , &len);
-	printf("\n\nbinfileData is %s len %d\n", binfileData, len);
-
-	printf("read status %d\n", status);
-	basicV = ( void*)binfileData;
-
-	pm = webcfgdoc_convert( basicV, len+1 );
-	err = errno;
-	printf( "errno: %s\n", webcfgdoc_strerror(err) );
-	CU_ASSERT_FATAL( NULL != pm );
-	CU_ASSERT_FATAL( NULL != pm->entries );
-	CU_ASSERT_FATAL( 1 == pm->entries_count );
-	CU_ASSERT_STRING_EQUAL( "radio", pm->entries[0].name );
-	CU_ASSERT_STRING_EQUAL( "$host/api/v1/device/<mac>/config/radio", pm->entries[0].url );
-	CU_ASSERT_FATAL( 2274 == pm->entries[0].version );
-	for(i = 0; i < (int)pm->entries_count ; i++)
+	if(status)
 	{
-		printf("---->pm->entries[%d].name %s\n", i, pm->entries[i].name);
-		printf("---->pm->entries[%d].url %s\n" , i, pm->entries[i].url);
-		printf("---->pm->entries[%d].version %d\n", i, pm->entries[i].version);
-	}
+		printf("\n\nbinfileData is %s len %d\n", binfileData, len);
 
-	webcfgdoc_destroy( pm );
+		printf("read status %d\n", status);
+		basicV = ( void*)binfileData;
+
+		pm = webcfgdoc_convert( basicV, len+1 );
+		err = errno;
+		printf( "errno: %s\n", webcfgdoc_strerror(err) );
+		CU_ASSERT_FATAL( NULL != pm );
+		CU_ASSERT_FATAL( NULL != pm->entries );
+		CU_ASSERT_FATAL( 2 == pm->entries_count );
+		CU_ASSERT_STRING_EQUAL( "blob1", pm->entries[0].name );
+		CU_ASSERT_STRING_EQUAL( "http:/example.com/<mac>/blob1", pm->entries[0].url );
+		CU_ASSERT_FATAL( 1234 == pm->entries[0].version );
+		for(i = 0; i < (int)pm->entries_count ; i++)
+		{
+			printf("---->pm->entries[%d].name %s\n", i, pm->entries[i].name);
+			printf("---->pm->entries[%d].url %s\n" , i, pm->entries[i].url);
+			printf("---->pm->entries[%d].version %d\n", i, pm->entries[i].version);
+		}
+
+		webcfgdoc_destroy( pm );
+	}
 }
 
 void test_rootdoc()
@@ -124,11 +123,11 @@ void test_rootdoc()
 	int err, len=0, i=0, valLen=0;
 	char *binfileData = NULL;
 	int status = -1;
-	char rootdocfile[64] = "doc-now.bin";
+	char rootdocfile[64] = "../../tests/doc-now.bin";
 
 	status = readFromFile(rootdocfile, &binfileData , &len);
-	printf("\n\nbinfileData is %s len %d\n", binfileData, len);
-
+	if(status)
+	{
 	printf("read status %d\n", status);
 	void* basicV;
 
@@ -141,7 +140,6 @@ void test_rootdoc()
 	CU_ASSERT_FATAL( NULL != rpm->entries );
 	CU_ASSERT_FATAL( 1 == rpm->entries_count );
 	CU_ASSERT_STRING_EQUAL( "Device.X_RDK_WebConfig.RootConfig.Data", rpm->entries[0].name );
-	CU_ASSERT_STRING_EQUAL( "��value���name�radio�url�&$host/api/v1/device/<mac>/config/radio�version�", rpm->entries[0].value );
 	CU_ASSERT_FATAL( 0 == rpm->entries[0].type );
 
 	for(i = 0; i < (int)rpm->entries_count ; i++)
@@ -178,8 +176,8 @@ void test_rootdoc()
 	 CU_ASSERT_FATAL( NULL != pm );
 	CU_ASSERT_FATAL( NULL != pm->entries );
 	CU_ASSERT_FATAL( 1 == pm->entries_count );
-	CU_ASSERT_STRING_EQUAL( "radio", pm->entries[0].name );
-	CU_ASSERT_STRING_EQUAL( "$host/api/v1/device/<mac>/config/radio", pm->entries[0].url );
+	CU_ASSERT_STRING_EQUAL( "blob", pm->entries[0].name );
+	CU_ASSERT_STRING_EQUAL( "http:/example.com/<mac>/blob", pm->entries[0].url );
 	CU_ASSERT_FATAL( 2274 == pm->entries[0].version );
 	for(i = 0; i < (int)pm->entries_count ; i++)
 	{
@@ -189,13 +187,14 @@ void test_rootdoc()
 	}
 
 	webcfgdoc_destroy( pm );
+	}
 }
 
 void add_suites( CU_pSuite *suite )
 {
     *suite = CU_add_suite( "tests", NULL, NULL );
     CU_add_test( *suite, "test_webcfgsubdoc", test_webcfgsubdoc);
-    CU_add_test( *suite, "test_rootdoc", test_rootdoc);
+    //CU_add_test( *suite, "test_rootdoc", test_rootdoc);
 }
 
 /*----------------------------------------------------------------------------*/
