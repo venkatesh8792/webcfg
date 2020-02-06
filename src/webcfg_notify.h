@@ -13,22 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef REQUEST_H
-#define REQUEST_H
+#ifndef WEBCFGNOTIFY_H
+#define WEBCFGNOTIFY_H
 
 #include <stdint.h>
-#include <curl/curl.h>
+#include "cJSON.h"
 #include "webcfg_log.h"
 #include "webcfg.h"
 
-/**
- *  Makes the HTTP request and provides the response.
- *
- *
- *  @return 0 on success, error otherwise
- */
-int webcfg_http_request(char **configData, int r_count, int index, int status, long *code, char **transaction_id);
-
-
-
+void initWebConfigNotifyTask();
+pthread_t get_global_notify_threadid();
+void addWebConfigNotifyMsg(char *url, long status_code, char *application_status, int application_details, char *request_timestamp, char *version, char *transaction_uuid);
 #endif

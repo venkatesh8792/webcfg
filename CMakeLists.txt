@@ -58,6 +58,18 @@ ExternalProject_Add(msgpack
 add_library(libmsgpack STATIC SHARED IMPORTED)
 add_dependencies(libmsgpack msgpack)
 
+# cJSON external dependency
+#-------------------------------------------------------------------------------
+ExternalProject_Add(cJSON
+    PREFIX ${PREFIX_DIR}/cJSON
+    GIT_REPOSITORY https://github.com/DaveGamble/cJSON.git
+    GIT_TAG "aafb64a1c549b7b927e339df6d35b1d5059dc235"
+    CMAKE_ARGS += -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR}
+)
+add_library(libcJSON STATIC IMPORTED)
+add_dependencies(libcJSON cJSON)
+
+
 # cimplog external dependency
 #-------------------------------------------------------------------------------
 ExternalProject_Add(cimplog

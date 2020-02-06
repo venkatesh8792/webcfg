@@ -13,22 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef REQUEST_H
-#define REQUEST_H
+#ifndef WEBCFGAUTH_H
+#define WEBCFGAUTH_H
 
 #include <stdint.h>
 #include <curl/curl.h>
 #include "webcfg_log.h"
 #include "webcfg.h"
 
-/**
- *  Makes the HTTP request and provides the response.
- *
- *
- *  @return 0 on success, error otherwise
- */
-int webcfg_http_request(char **configData, int r_count, int index, int status, long *code, char **transaction_id);
+#define WEBPA_READ_HEADER             "/etc/parodus/parodus_read_file.sh"
+#define WEBPA_CREATE_HEADER           "/etc/parodus/parodus_create_file.sh"
 
 
+void getAuthToken();
+void createNewAuthToken(char *newToken, size_t len, char *hw_mac, char* hw_serial_number);
+char* get_global_auth_token();
+char* get_global_serialNum();
 
 #endif

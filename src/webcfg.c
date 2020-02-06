@@ -18,10 +18,13 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <errno.h>
+#include <math.h>
 #include <string.h>
 #include "webcfg.h"
 #include "http.h"
-
+#include "webcfg_notify.h"
+#include "webcfg_common.h"
+#include "webcfg_auth.h"
 /*----------------------------------------------------------------------------*/
 /*                                   Macros                                   */
 /*----------------------------------------------------------------------------*/
@@ -41,8 +44,9 @@ pthread_cond_t periodicsync_condition=PTHREAD_COND_INITIALIZER;
 /*----------------------------------------------------------------------------*/
 /*                             Function Prototypes                            */
 /*----------------------------------------------------------------------------*/
-int handleHttpResponse(long response_code, char *webConfigData, int retry_count, int index, char* transaction_uuid);
 void *WebConfigTask();
+int processMsgPackDocument(char *jsonData, int *retStatus, char **docVersion);
+int handleHttpResponse(long response_code, char *webConfigData, int retry_count, int index, char* transaction_uuid);
 /*----------------------------------------------------------------------------*/
 /*                             External Functions                             */
 /*----------------------------------------------------------------------------*/
@@ -67,25 +71,24 @@ void webcfg_init()
 void *WebConfigTask()
 {
 	pthread_detach(pthread_self());
-	int index=0;//, i=0;
-	/*int ret = 0;
-	int json_status=-1;
-	int rv=0, rc=0;
+	int index=0;
+	int ret = 0;
+	int rv=0;
         struct timeval tp;
         struct timespec ts;
         time_t t;
-	int count=0;
 	int wait_flag=0;
-	int forced_sync=0, syncIndex = 0;
-        int value =Get_PeriodicSyncCheckInterval();
-*/
+	int forced_sync=0;//, syncIndex = 0;
+        int value=0;
+	value =Get_PeriodicSyncCheckInterval();
+
 	//start webconfig notification thread.
-	/*initWebConfigNotifyTask();
+	initWebConfigNotifyTask();
 
 	while(1)
 	{
 		if(forced_sync)
-		{*/
+		{
 			//trigger sync only for particular index
 			/*WebConfigLog("Trigger Forced sync for index %d\n", syncIndex);
 			processWebconfigSync(syncIndex, (int)status);
@@ -93,24 +96,11 @@ void *WebConfigTask()
 			forced_sync = 0;
 			syncIndex = 0;
 			WebConfigLog("reset ForceSyncCheck after sync\n");
-			setForceSyncCheck(index, false, "", 0);
+			setForceSyncCheck(index, false, "", 0);*/
 		}
 		else if(!wait_flag)
-		{*/
-			//iterate through all entries in Device.X_RDK_WebConfig.ConfigFile.[i].URL to check if the current stored version of each configuration document matches the latest version on the cloud.
-
-			/*count = getConfigNumberOfEntries();
-			WebConfigLog("count returned from getConfigNumberOfEntries:%d\n", count);
-
-			for(i = 0; i < count; i++)
-			{
-				index = getInstanceNumberAtIndex(i);
-				WebConfigLog("index returned from getInstanceNumberAtIndex:%d\n", index);
-				if(index != 0)
-				{*/
-					processWebconfigSync(index);
-				/*}
-			}
+		{
+			processWebconfigSync(index);
 		}
 
 		pthread_mutex_lock (&periodicsync_mutex);
@@ -142,8 +132,8 @@ void *WebConfigTask()
 		if(!rv && !g_shutdown)
 		{
 			time(&t);
-			BOOL ForceSyncEnable;
-			char* ForceSyncTransID = NULL;*/
+			//BOOL ForceSyncEnable;
+			//char* ForceSyncTransID = NULL;
 
 			// Iterate through all indexes to check which index needs ForceSync
 			/*count = getConfigNumberOfEntries();
@@ -164,13 +154,13 @@ void *WebConfigTask()
 						forced_sync = 1;
 						syncIndex = index;
 						WebConfigLog("Received signal interrupt to getForceSyncCheck at %s\n",ctime(&t));
-						WAL_FREE(ForceSyncTransID);
+						WEBCFG_FREE(ForceSyncTransID);
 						break;
 					}
 					WebConfigLog("ForceSyncEnable is false\n");
-					WAL_FREE(ForceSyncTransID);
+					WEBCFG_FREE(ForceSyncTransID);
 				}
-			}
+			}*/
 			WebConfigLog("forced_sync is %d\n", forced_sync);
 			if(!forced_sync)
 			{
@@ -194,9 +184,9 @@ void *WebConfigTask()
 		pthread_mutex_unlock(&periodicsync_mutex);
 
 	}
-	if(NotificationThreadId)
+	if(get_global_notify_threadid())
 	{
-		ret = pthread_join (NotificationThreadId, NULL);
+		ret = pthread_join (get_global_notify_threadid(), NULL);
 		if(ret ==0)
 		{
 			WebConfigLog("pthread_join returns success\n");
@@ -205,14 +195,12 @@ void *WebConfigTask()
 		{
 			WebConfigLog("Error joining thread\n");
 		}
-	}*/
+	}
 	WebConfigLog("B4 pthread_exit\n");
 	pthread_exit(0);
 	WebcfgDebug("After pthread_exit\n");
 	return NULL;
 }
-
-
 
 /*----------------------------------------------------------------------------*/
 /*                             Internal functions                             */
@@ -260,15 +248,188 @@ void processWebconfigSync(int index)
 	return;
 }
 
+void webcfgStrncpy(char *destStr, const char *srcStr, size_t destSize)
+{
+    strncpy(destStr, srcStr, destSize-1);
+    destStr[destSize-1] = '\0';
+}
+
+
 int handleHttpResponse(long response_code, char *webConfigData, int retry_count, int index, char* transaction_uuid)
 {
+	int first_digit=0;
+	int msgpack_status=0;
+	int setRet = 0;
+	int ret=0, getRet = 0;
+	char *configURL = NULL;
+	char *configVersion = NULL;
+	char *RequestTimeStamp=NULL;
+	char *newDocVersion = NULL;
+	int err = 0;
+
+        //get common items for all status codes and send notification.
+        getRet = getConfigURL(index, &configURL); //remove the index and add the sub doc names
+	if(getRet)
+	{
+		WebcfgDebug("configURL for index %d is %s\n", index, configURL);
+	}
+	else
+	{
+		WebConfigLog("getConfigURL failed for index %d\n", index);
+	}
+
+	getRet = getConfigVersion(index, &configVersion);
+	if(getRet)
+	{
+		WebConfigLog("configVersion for index %d is %s\n", index, configVersion);
+	}
+	else
+	{
+		WebConfigLog("getConfigVersion failed for index %d\n", index);
+	}
+
+        ret = setRequestTimeStamp(index);
+	if(ret == 0)
+	{
+		WebcfgDebug("RequestTimeStamp set successfully for index %d\n", index);
+	}
+	else
+	{
+		WebConfigLog("Failed to set RequestTimeStamp for index %d\n", index);
+	}
+
+        getRet = getRequestTimeStamp(index, &RequestTimeStamp);
+	if(getRet)
+	{
+		WebcfgDebug("RequestTimeStamp for index %d is %s\n", index, RequestTimeStamp);
+	}
+	else
+	{
+		WebConfigLog("RequestTimeStamp get failed for index %d\n", index);
+	}
+
+	if(response_code == 304)
+	{
+		WebConfigLog("webConfig is in sync with cloud. response_code:%d\n", response_code);
+		setSyncCheckOK(index, true);
+		addWebConfigNotifyMsg(configURL, response_code, NULL, 0, RequestTimeStamp , configVersion, transaction_uuid);
+		return 1;
+	}
+	else if(response_code == 200)
+	{
+		WebConfigLog("webConfig is not in sync with cloud. response_code:%d\n", response_code);
+
+		if(webConfigData !=NULL)
+		{
+			WebcfgDebug("webConfigData fetched successfully\n");
+			msgpack_status = processMsgPackDocument(webConfigData, &setRet, &newDocVersion);
+			WebConfigLog("setRet after process msgPack is %d\n", setRet);
+			WebcfgDebug("newDocVersion is %s\n", newDocVersion);
+
+			if(msgpack_status == 1)
+			{
+				WebcfgDebug("processMsgPackDocument success\n");
+				if(configURL!=NULL && newDocVersion !=NULL)
+				{
+					WebConfigLog("Configuration settings from %s version %s were applied successfully\n", configURL, newDocVersion );
+				}
+
+				WebcfgDebug("set version and syncCheckOK for success\n");
+				ret = setConfigVersion(index, newDocVersion);//get new version from msgpack doc
+				if(ret == 0)
+				{
+					WebcfgDebug("Config Version %s set successfully for index %d\n", newDocVersion, index);
+				}
+				else
+				{
+					WebConfigLog("Failed to set Config version %s for index %d\n", newDocVersion, index);
+				}
+
+				ret = setSyncCheckOK(index, true );
+				if(ret == 0)
+				{
+					WebcfgDebug("SyncCheckOK set successfully for index %d\n", index);
+				}
+				else
+				{
+					WebConfigLog("Failed to set SyncCheckOK for index %d\n", index);
+				}
+
+				addWebConfigNotifyMsg(configURL, response_code, "success", setRet, RequestTimeStamp , newDocVersion, transaction_uuid);
+				return 1;
+			}
+			else
+			{
+				WebConfigLog("Failure in processJsonDocument\n");
+				ret = setSyncCheckOK(index, false);
+				if(ret == 0)
+				{
+					WebcfgDebug("SyncCheckOK set to false for index %d\n", index);
+				}
+				else
+				{
+					WebConfigLog("Failed to set SyncCheckOK to false for index %d\n", index);
+				}
+
+				WebConfigLog("Configuration settings from %s version %s FAILED\n", configURL, newDocVersion );
+				WebConfigLog("Sending Webconfig apply Failure Notification\n");
+				addWebConfigNotifyMsg(configURL, response_code, "failed", setRet, RequestTimeStamp , newDocVersion, transaction_uuid);
+				return 1;
+			}
+		}
+		else
+		{
+			WebConfigLog("webConfigData is empty, need to retry\n");
+		}
+	}
+	else if(response_code == 204)
+	{
+		WebConfigLog("No configuration available for this device. response_code:%d\n", response_code);
+		addWebConfigNotifyMsg(configURL, response_code, NULL, 0, RequestTimeStamp , configVersion, transaction_uuid);
+		return 1;
+	}
+	else if(response_code == 403)
+	{
+		WebConfigLog("Token is expired, fetch new token. response_code:%d\n", response_code);
+		createNewAuthToken(get_global_auth_token(), sizeof(get_global_auth_token()), get_global_deviceMAC(), get_global_serialNum() );
+		WebcfgDebug("createNewAuthToken done in 403 case\n");
+		err = 1;
+	}
+	else if(response_code == 429)
+	{
+		WebConfigLog("No action required from client. response_code:%d\n", response_code);
+		WEBCFG_FREE(configURL);
+		WEBCFG_FREE(configVersion);
+		WEBCFG_FREE(RequestTimeStamp);
+		WEBCFG_FREE(transaction_uuid);
+		return 1;
+	}
+	first_digit = (int)(response_code / pow(10, (int)log10(response_code)));
+	if((response_code !=403) && (first_digit == 4)) //4xx
+	{
+		WebConfigLog("Action not supported. response_code:%d\n", response_code);
+		addWebConfigNotifyMsg(configURL, response_code, NULL, 0, RequestTimeStamp , configVersion, transaction_uuid);
+		return 1;
+	}
+	else //5xx & all other errors
+	{
+		WebConfigLog("Error code returned, need to retry. response_code:%d\n", response_code);
+		if(retry_count == 3 && !err)
+		{
+			WebcfgDebug("Sending Notification after 3 retry attempts\n");
+			addWebConfigNotifyMsg(configURL, response_code, NULL, 0, RequestTimeStamp , configVersion, transaction_uuid);
+			return 0;
+		}
+		WEBCFG_FREE(configURL);
+		WEBCFG_FREE(configVersion);
+		WEBCFG_FREE(RequestTimeStamp);
+		WEBCFG_FREE(transaction_uuid);
+	}
 	return 0;
 }
 
-void getConfigURL(char **Url)
+int processMsgPackDocument(char *jsonData, int *retStatus, char **docVersion)
 {
-	*Url = strdup("https://example.com"); //get the url from partners.json
-
+	WebConfigLog("--------------processMsgPackDocument----------------\n");
+	return 0;
 }
-
-

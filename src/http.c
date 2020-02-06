@@ -15,7 +15,7 @@
  */
 
 #include "http.h"
-//#include "http_headers.h"
+#include "webcfg_auth.h"
 #include <uuid/uuid.h>
 #include <string.h>
 #include <stdlib.h>
@@ -23,8 +23,12 @@
 /*----------------------------------------------------------------------------*/
 /*                                   Macros                                   */
 /*----------------------------------------------------------------------------*/
-/* none */
-
+#define MAX_HEADER_LEN			4096
+#define ETAG_HEADER 		       "ETag:"
+#define CURL_TIMEOUT_SEC	   25L
+#define CA_CERT_PATH 		   "/etc/ssl/certs/ca-certificates.crt"
+#define WEBPA_READ_HEADER             "/etc/parodus/parodus_read_file.sh"
+#define WEBPA_CREATE_HEADER           "/etc/parodus/parodus_create_file.sh"
 /*----------------------------------------------------------------------------*/
 /*                               Data Structures                              */
 /*----------------------------------------------------------------------------*/
@@ -36,15 +40,20 @@ struct token_data {
 /*----------------------------------------------------------------------------*/
 /*                            File Scoped Variables                           */
 /*----------------------------------------------------------------------------*/
-//static char g_systemReadyTime[64]={'\0'};
+static char g_systemReadyTime[64]={'\0'};
 static char g_interface[32]={'\0'};
-//static char g_FirmwareVersion[64]={'\0'};
-//static char g_bootTime[64]={'\0'};
+static char g_FirmwareVersion[64]={'\0'};
+static char g_bootTime[64]={'\0'};
+static char g_productClass[64]={'\0'};
+static char g_ModelName[64]={'\0'};
+static char g_ETAG[64]={'\0'};
 /*----------------------------------------------------------------------------*/
 /*                             Function Prototypes                            */
 /*----------------------------------------------------------------------------*/
 size_t write_callback_fn(void *buffer, size_t size, size_t nmemb, struct token_data *data);
-void createCurlheader( struct curl_slist *list, struct curl_slist **header_list, int status, char ** trans_uuid);
+size_t header_callback(char *buffer, size_t size, size_t nitems);
+void stripSpaces(char *str, char **final_str);
+void createCurlheader( struct curl_slist *list, struct curl_slist **header_list, int status, int index, char ** trans_uuid);
 char* generate_trans_uuid();
 /*----------------------------------------------------------------------------*/
 /*                             External Functions                             */
@@ -87,23 +96,23 @@ int webcfg_http_request(char **configData, int r_count, int index, int status, l
 			return rv;
 		}
 		data.data[0] = '\0';
-		createCurlheader(list, &headers_list, status, &transID);
+		createCurlheader(list, &headers_list, status, index, &transID);
 		if(transID !=NULL)
 		{
 			*transaction_id = strdup(transID);
 			WEBCFG_FREE(transID);
 		}
-		getConfigURL(&configURL);
+		getConfigURL(index, &configURL);
 		WebConfigLog("configURL fetched is %s\n", configURL);
 
 		if(configURL !=NULL)
 		{
-			WebConfigLog("webConfigURL is %s\n", webConfigURL);
+			WebConfigLog("webconfig root ConfigURL is %s\n", webConfigURL);
 			curl_easy_setopt(curl, CURLOPT_URL, webConfigURL );
 		}
 		else
 		{
-			WebConfigLog("Failed to get configURL\n");
+			WebConfigLog("Failed to get webconfig root configURL\n");
 		}
 		curl_easy_setopt(curl, CURLOPT_TIMEOUT, CURL_TIMEOUT_SEC);
 		WebcfgDebug("fetching interface from device.properties\n");
@@ -132,7 +141,7 @@ int webcfg_http_request(char **configData, int r_count, int index, int status, l
 		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers_list);
 
 		//WebcfgDebug("Set CURLOPT_HEADERFUNCTION option\n");
-		//curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, NULL);
+		curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_callback);
 
 		// setting curl resolve option as default mode.
 		//If any failure, retry with v4 first and then v6 mode. 
@@ -182,7 +191,7 @@ int webcfg_http_request(char **configData, int r_count, int index, int status, l
 			content_res = curl_easy_getinfo(curl, CURLINFO_CONTENT_TYPE, &ct);
 			if(!content_res && ct)
 			{
-				if(strcmp(ct, "application/json") !=0)
+				if(strcmp(ct, "application/msgpack") !=0)
 				{
 					WebConfigLog("Invalid Content-Type\n");
 				}
@@ -243,45 +252,102 @@ size_t write_callback_fn(void *buffer, size_t size, size_t nmemb, struct token_d
     return size * nmemb;
 }
 
+/* @brief callback function to extract response header data.
+*/
+size_t header_callback(char *buffer, size_t size, size_t nitems)
+{
+	size_t etag_len = 0;
+	char* header_value = NULL;
+	char* final_header = NULL;
+	char header_str[64] = {'\0'};
+
+	etag_len = strlen(ETAG_HEADER);
+	if( nitems > etag_len )
+	{
+		if( strncasecmp(ETAG_HEADER, buffer, etag_len) == 0 )
+		{
+			header_value = strtok(buffer, ":");
+			while( header_value != NULL )
+			{
+				header_value = strtok(NULL, ":");
+				if(header_value !=NULL)
+				{
+					strncpy(header_str, header_value, sizeof(header_str)-1);
+					WebcfgDebug("header_str is %s\n", header_str);
+					stripSpaces(header_str, &final_header);
+
+					WebcfgDebug("final_header is %s len %lu\n", final_header, strlen(final_header));
+					strncpy(g_ETAG, final_header, sizeof(g_ETAG)-1);
+				}
+			}
+		}
+	}
+	return nitems;
+}
+
+//To strip all spaces , new line & carriage return characters from header output
+void stripSpaces(char *str, char **final_str)
+{
+	int i=0, j=0;
+
+	for(i=0;str[i]!='\0';++i)
+	{
+		if(str[i]!=' ')
+		{
+			if(str[i]!='\n')
+			{
+				if(str[i]!='\r')
+				{
+					str[j++]=str[i];
+				}
+			}
+		}
+	}
+	str[j]='\0';
+	*final_str = str;
+}
 
 /* @brief Function to create curl header options
  * @param[in] list temp curl header list
  * @param[in] device status value
  * @param[out] header_list output curl header list
 */
-void createCurlheader( struct curl_slist *list, struct curl_slist **header_list, int status, char ** trans_uuid)
+void createCurlheader( struct curl_slist *list, struct curl_slist **header_list, int status, int index, char ** trans_uuid)
 {
-	/*char *version_header = NULL;
+	char *version_header = NULL;
 	char *auth_header = NULL;
 	char *status_header=NULL;
 	char *schema_header=NULL;
 	char *bootTime = NULL, *bootTime_header = NULL;
 	char *FwVersion = NULL, *FwVersion_header=NULL;
+        char *productClass = NULL, *productClass_header = NULL;
+	char *ModelName = NULL, *ModelName_header = NULL;
 	char *systemReadyTime = NULL, *systemReadyTime_header=NULL;
 	struct timespec cTime;
 	char currentTime[32];
 	char *currentTime_header=NULL;
 	char *uuid_header = NULL;
 	char *transaction_uuid = NULL;
-	char *version = NULL;*/
+	char *version = NULL;
 	//char* syncTransID = NULL;
 	//BOOL ForceSyncEnable;
 
 	WebConfigLog("Start of createCurlheader\n");
 	//Fetch auth JWT token from cloud.
-	/*getAuthToken();
+	getAuthToken();
+	WebConfigLog("get_global_auth_token() is %s\n", get_global_auth_token());
 	
 	auth_header = (char *) malloc(sizeof(char)*MAX_HEADER_LEN);
 	if(auth_header !=NULL)
 	{
-		snprintf(auth_header, MAX_HEADER_LEN, "Authorization:Bearer %s", (0 < strlen(webpa_auth_token) ? webpa_auth_token : NULL));
+		snprintf(auth_header, MAX_HEADER_LEN, "Authorization:Bearer %s", (0 < strlen(get_global_auth_token()) ? get_global_auth_token() : NULL));
 		list = curl_slist_append(list, auth_header);
 		WEBCFG_FREE(auth_header);
 	}
 	version_header = (char *) malloc(sizeof(char)*MAX_BUF_SIZE);
 	if(version_header !=NULL)
 	{
-		getConfigVersion(&version);
+		getConfigVersion(index, &version);
 		snprintf(version_header, MAX_BUF_SIZE, "IF-NONE-MATCH:%s", ((NULL != version && (strlen(version)!=0)) ? version : "NONE"));
 		WebConfigLog("version_header formed %s\n", version_header);
 		list = curl_slist_append(list, version_header);
@@ -291,6 +357,7 @@ void createCurlheader( struct curl_slist *list, struct curl_slist **header_list,
 			WEBCFG_FREE(version);
 		}
 	}
+	list = curl_slist_append(list, "Accept: application/msgpack");
 
 	schema_header = (char *) malloc(sizeof(char)*MAX_BUF_SIZE);
 	if(schema_header !=NULL)
@@ -410,7 +477,7 @@ void createCurlheader( struct curl_slist *list, struct curl_slist **header_list,
                 WebConfigLog("Failed to get systemReadyTime\n");
         }
 
-	getForceSyncCheck(&ForceSyncEnable, &syncTransID);
+	/*getForceSyncCheck(&ForceSyncEnable, &syncTransID);
 	if(syncTransID !=NULL)
 	{
 		if(ForceSyncEnable && strlen(syncTransID)>0)
@@ -419,7 +486,7 @@ void createCurlheader( struct curl_slist *list, struct curl_slist **header_list,
 			transaction_uuid = strdup(syncTransID);
 		}
 		WEBCFG_FREE(syncTransID);
-	}
+	}*/
 
 	if(transaction_uuid == NULL)
 	{
@@ -443,7 +510,61 @@ void createCurlheader( struct curl_slist *list, struct curl_slist **header_list,
 	{
 		WebConfigLog("Failed to generate transaction_uuid\n");
 	}
-	*header_list = list;*/
+
+	if(strlen(g_productClass) ==0)
+	{
+		productClass = getParameterValue(PRODUCT_CLASS);
+		if(productClass !=NULL)
+		{
+		       strncpy(g_productClass, productClass, sizeof(g_productClass)-1);
+		       WebcfgDebug("g_productClass fetched is %s\n", g_productClass);
+		       WEBCFG_FREE(productClass);
+		}
+	}
+
+	if(strlen(g_productClass))
+	{
+		productClass_header = (char *) malloc(sizeof(char)*MAX_BUF_SIZE);
+		if(productClass_header !=NULL)
+		{
+			snprintf(productClass_header, MAX_BUF_SIZE, "X-System-Product-Class: %s", g_productClass);
+			WebConfigLog("productClass_header formed %s\n", productClass_header);
+			list = curl_slist_append(list, productClass_header);
+			WEBCFG_FREE(productClass_header);
+		}
+	}
+	else
+	{
+		WebConfigLog("Failed to get productClass\n");
+	}
+
+	if(strlen(g_ModelName) ==0)
+	{
+		ModelName = getParameterValue(MODEL_NAME);
+		if(ModelName !=NULL)
+		{
+		       strncpy(g_ModelName, ModelName, sizeof(g_ModelName)-1);
+		       WebcfgDebug("g_ModelName fetched is %s\n", g_ModelName);
+		       WEBCFG_FREE(ModelName);
+		}
+	}
+
+	if(strlen(g_ModelName))
+	{
+		ModelName_header = (char *) malloc(sizeof(char)*MAX_BUF_SIZE);
+		if(ModelName_header !=NULL)
+		{
+			snprintf(ModelName_header, MAX_BUF_SIZE, "X-System-Model-Name: %s", g_ModelName);
+			WebConfigLog("ModelName_header formed %s\n", ModelName_header);
+			list = curl_slist_append(list, ModelName_header);
+			WEBCFG_FREE(ModelName_header);
+		}
+	}
+	else
+	{
+		WebConfigLog("Failed to get ModelName\n");
+	}
+	*header_list = list;
 }
 
 char* generate_trans_uuid()

@@ -72,8 +72,6 @@ static void __msgpack_pack_string_nvp( msgpack_packer *pk,
     }
 }
 
-
-
 ssize_t webcfg_pack_rootdoc( char *blob, const data_t *packData, void **data )
 {
     size_t rv = -1;

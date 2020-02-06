@@ -22,8 +22,21 @@
 /*----------------------------------------------------------------------------*/
 /*                                   Macros                                   */
 /*----------------------------------------------------------------------------*/
-/* none */
+#if defined(_COSA_BCM_MIPS_)
+#define DEVICE_MAC                   "Device.DPoE.Mac_address"
+#elif defined(PLATFORM_RASPBERRYPI)
+#define DEVICE_MAC                   "Device.Ethernet.Interface.5.MACAddress"
+#elif defined(RDKB_EMU)
+#define DEVICE_MAC                   "Device.DeviceInfo.X_COMCAST-COM_WAN_MAC"
+#else
+#define DEVICE_MAC                   "Device.X_CISCO_COM_CableModem.MACAddress"
+#endif
 
+#define SERIAL_NUMBER                "Device.DeviceInfo.SerialNumber"
+#define FIRMWARE_VERSION             "Device.DeviceInfo.X_CISCO_COM_FirmwareName"
+#define DEVICE_BOOT_TIME             "Device.DeviceInfo.X_RDKCENTRAL-COM_BootTime"
+#define MODEL_NAME		     "Device.DeviceInfo.ModelName"
+#define PRODUCT_CLASS		     "Device.DeviceInfo.ProductClass"
 /*----------------------------------------------------------------------------*/
 /*                               Data Structures                              */
 /*----------------------------------------------------------------------------*/
@@ -35,6 +48,19 @@
 /* return logger file name */
 const char *fetch_generic_file(void);
 void get_webCfg_interface(char **interface);
-int getConfigVersion(char **version);
+int getConfigVersion(int index, char **version);
+bool getConfigURL(int index, char **url);
+bool getRequestTimeStamp(int index,char **RequestTimeStamp);
+int setRequestTimeStamp(int index);
+int setSyncCheckOK(int index, bool status);
+int setConfigVersion(int index, char *version);
+int setSyncCheckOK(int index, bool status);
 
+char *get_global_systemReadyTime();
+void getCurrentTime(struct timespec *timer);
+char * getParameterValue(char *paramName);
+void getDeviceMac();
+char* get_global_deviceMAC();
+
+void sendNotification(char *payload, char *source, char *destination);
 #endif
