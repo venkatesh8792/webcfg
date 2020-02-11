@@ -25,6 +25,7 @@
 #include <curl/curl.h>
 
 char *url = NULL;
+char *interface = NULL;
 
 void test_multipart()
 {
@@ -44,7 +45,7 @@ void test_multipart()
 		printf("\nProvide config URL as argument\n");
 		return;
 	}
-	configRet = webcfg_http_request(url, &webConfigData, r_count, &res_code);
+	configRet = webcfg_http_request(url, &webConfigData, r_count, &res_code, interface);
 	if(configRet == 0)
 	{
 		printf("config ret success\n");
@@ -102,6 +103,10 @@ int main( int argc, char *argv[] )
     if(argv[1] !=NULL)
     {
     	url = strdup(argv[1]);
+    }
+    if(argv[2] !=NULL)
+    {
+    	interface = strdup(argv[2]);
     }
     if( CUE_SUCCESS == CU_initialize_registry() ) {
         add_suites( &suite );

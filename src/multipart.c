@@ -38,7 +38,7 @@ struct token_data {
 /*----------------------------------------------------------------------------*/
 /*                            File Scoped Variables                           */
 /*----------------------------------------------------------------------------*/
-static char g_interface[32]="wlan0";
+//static char g_interface[32]={'\0'};
 static char g_ETAG[64]={'\0'};
 char webpa_auth_token[4096]={'\0'};
 #define DATA_SIZE 2321
@@ -61,7 +61,7 @@ void parse_multipart(char *ptr, int no_of_bytes, int part_no);
 * @param[in] r_count Number of curl retries on ipv4 and ipv6 mode during failure
 * @return returns 0 if success, otherwise failed to fetch auth token and will be retried.
 */
-int webcfg_http_request(char *webConfigURL, char **configData, int r_count, long *code)
+int webcfg_http_request(char *webConfigURL, char **configData, int r_count, long *code, char *interface)
 {
 	CURL *curl;
 	CURLcode res;
@@ -71,7 +71,7 @@ int webcfg_http_request(char *webConfigURL, char **configData, int r_count, long
 	int rv=1;
 	double total;
 	long response_code = 0;
-	char *interface = NULL;
+	//char *interface = NULL;
 	char *ct = NULL;
 	char *boundary = NULL;
 	char *str=NULL;
@@ -109,7 +109,7 @@ int webcfg_http_request(char *webConfigURL, char **configData, int r_count, long
 			printf("Failed to get webconfig root configURL\n");
 		}
 		curl_easy_setopt(curl, CURLOPT_TIMEOUT, CURL_TIMEOUT_SEC);
-		if(strlen(g_interface) == 0)
+		/**if(strlen(g_interface) == 0)
 		{
 			//get_webCfg_interface(&interface);
 			if(interface !=NULL)
@@ -119,11 +119,11 @@ int webcfg_http_request(char *webConfigURL, char **configData, int r_count, long
 		               WEBCFG_FREE(interface);
 		        }
 		}
-		printf("g_interface fetched is %s\n", g_interface);
-		if(strlen(g_interface) > 0)
+		printf("g_interface fetched is %s\n", g_interface);**/
+		if(strlen(interface) > 0)
 		{
-			printf("setting interface %s\n", g_interface);
-			curl_easy_setopt(curl, CURLOPT_INTERFACE, g_interface);
+			printf("setting interface %s\n", interface);
+			curl_easy_setopt(curl, CURLOPT_INTERFACE, interface);
 		}
 
 		// set callback for writing received data
@@ -418,6 +418,28 @@ void stripSpaces(char *str, char **final_str)
 	*final_str = str;
 }
 
+int readFromFile(char *filename, char **data, int *len)
+{
+	FILE *fp;
+	int ch_count = 0;
+	fp = fopen(filename, "r+");
+	if (fp == NULL)
+	{
+		printf("Failed to open file %s\n", filename);
+		return 0;
+	}
+	fseek(fp, 0, SEEK_END);
+	ch_count = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	*data = (char *) malloc(sizeof(char) * (ch_count + 1));
+	fread(*data, 1, ch_count,fp);
+        
+	*len = ch_count;
+	(*data)[ch_count] ='\0';
+	fclose(fp);
+	return 1;
+}
+
 /* @brief Function to create curl header options
  * @param[in] list temp curl header list
  * @param[in] device status value
@@ -426,10 +448,14 @@ void stripSpaces(char *str, char **final_str)
 void createCurlheader( struct curl_slist *list, struct curl_slist **header_list)
 {
 	char *auth_header = NULL;
+	char *token = NULL;
+	int len = 0;
 
 	printf("Start of createCurlheader\n");
-	//add auth token here. for test purpose.
-	strcpy(webpa_auth_token, "");
+
+	// Read token from file
+	readFromFile("webcfg_token", &token, &len );
+	strncpy(webpa_auth_token, token, len);
 	if(strlen(webpa_auth_token)==0)
 	{
 		printf(">>>>>>><token> is NULL.. hardcode token here. for test purpose.\n");
