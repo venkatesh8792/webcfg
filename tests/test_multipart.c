@@ -21,6 +21,8 @@
 #include "../src/webcfgdoc.h"
 #include "../src/webcfgparam.h"
 #include "../src/multipart.h"
+#include "../src/portmappingdoc.h"
+#include "../src/portmappingparam.h"
 #include <msgpack.h>
 #include <curl/curl.h>
 
@@ -50,7 +52,7 @@ void test_multipart()
 	{
 		printf("config ret success\n");
 		//printf("webConfigData is %s\n", webConfigData);
-                int status = subdocparse("part3",&subfileData,&len);
+                int status = subdocparse("part5",&subfileData,&len);
                 if(status)
 		{       
                         
