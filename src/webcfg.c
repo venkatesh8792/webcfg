@@ -50,7 +50,6 @@ bool g_shutdown  = false;
 /*                             Function Prototypes                            */
 /*----------------------------------------------------------------------------*/
 void *WebConfigMultipartTask();
-int processMsgPackDocument(char *jsonData, int *retStatus, char **docVersion);
 int handlehttpResponse(long response_code, char *webConfigData, int retry_count, int index, char* transaction_uuid, char* ct, size_t dataSize);
 /*----------------------------------------------------------------------------*/
 /*                             External Functions                             */
@@ -234,17 +233,12 @@ void processWebconfgSync(int index)
 			break;
 		}
 		printf("index is %d\n", index);
-		//configRet = webcfg_http_request(&webConfigData, r_count, &res_code, &transaction_uuid);
 		configRet = webcfg_http_request(&webConfigData, r_count, index, status, &res_code, &transaction_uuid, &ct, &dataSize);
 		printf("After webcfg_http_request ct is %s\n", ct );
-		//WebConfigLog("processMultipartDocument\n");
-		//configRet = processMultipartDocument();
-		//WebConfigLog("processMultipartDocument complete\n");
 		if(configRet == 0)
 		{
 			WebConfigLog("B4 handlehttpResponse\n");
 			rv = handlehttpResponse(res_code, webConfigData, retry_count, index, transaction_uuid, ct, dataSize);
-			//rv  = 1;
 			if(rv ==1)
 			{
 				WebConfigLog("No retries are required. Exiting..\n");
@@ -331,7 +325,6 @@ int handlehttpResponse(long response_code, char *webConfigData, int retry_count,
 		if(webConfigData !=NULL)
 		{
 			WebcfgDebug("webConfigData fetched successfully\n");
-			//msgpack_status = processMsgPackDocument(webConfigData, &setRet, &newDocVersion);
 			WebConfigLog("parseMultipartDocument\n");
 			msgpack_status = parseMultipartDocument(webConfigData, ct, dataSize);
 			WebConfigLog("setRet after process msgPack is %d\n", setRet);
@@ -339,7 +332,7 @@ int handlehttpResponse(long response_code, char *webConfigData, int retry_count,
 
 			if(msgpack_status == 1)
 			{
-				WebcfgDebug("processMsgPackDocument success\n");
+				WebcfgDebug("parseMultipartDocument success\n");
 				if(configURL!=NULL && newDocVersion !=NULL)
 				{
 					WebConfigLog("Configuration settings from %s version %s were applied successfully\n", configURL, newDocVersion );
@@ -439,13 +432,6 @@ int handlehttpResponse(long response_code, char *webConfigData, int retry_count,
 	return 0;
 }
 
-int processMsgPackDocument(char *jsonData, int *retStatus, char **docVersion)
-{
-	printf("jsonData %s retStatus %d docVersion %s\n" , jsonData, *retStatus, *docVersion);
-	WebConfigLog("--------------processMsgPackDocument----------------\n");
-	return 0;
-}
-
 int processMultipartDocument()
 {
 	int r_count=0;
@@ -469,7 +455,6 @@ int processMultipartDocument()
         startPtr = &start;
         endPtr = &end;
 
-	//configRet = webcfg_http_request(&webConfigData, r_count, index, status, &res_code, &transaction_uuid);
 	configRet = webcfg_http_request(&webConfigData, r_count, index, status, &res_code, &transaction_uuid, NULL, 0);
 	if(configRet == 0)
 	{
