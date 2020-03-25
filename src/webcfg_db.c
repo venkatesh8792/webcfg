@@ -250,7 +250,6 @@ int addToTmpList( multipart_t *mp)
 	int retStatus = 0;
 
 	WebConfigLog("mp->entries_count is %zu\n", mp->entries_count);
-	WebConfigLog("B4 addToTmpList numOfMpDocs %d\n", numOfMpDocs);
 	numOfMpDocs = 0;
 	WebConfigLog("reset numOfMpDocs to %d\n", numOfMpDocs);
 	for(m = 0 ; m<((int)mp->entries_count); m++)
@@ -263,14 +262,12 @@ int addToTmpList( multipart_t *mp)
 
 			if(numOfMpDocs == 0)
 			{
-				WebConfigLog("Adding root to tmp\n");
 				new_node->name = strdup("root");
 				new_node->version = (uint32_t)0;
 				new_node->status = strdup("pending");
 			}
 			else
 			{
-				WebConfigLog("Adding docs to tmp. m value is %d\n", m);
 				new_node->name = strdup(mp->entries[m-1].name_space);
 				WebConfigLog("mp->entries[m-1].name_space is %s\n", mp->entries[m-1].name_space);
 				new_node->version = mp->entries[m-1].etag;
@@ -560,11 +557,7 @@ void b64_encoder(const void *buf,size_t len, char ** decodeMsg)
 	WebConfigLog("base64 decoded data containing %ld bytes is :%s\n",size, *decodeMsg);
 
 	WebConfigLog("----End of b64 decoding----\n");
-
 	//End of b64 decoding
-
-	
-	WebConfigLog("----End of msgpack decoding----\n");
 
 }
 

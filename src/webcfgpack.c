@@ -297,7 +297,7 @@ ssize_t webcfgdb_pack( webconfig_db_data_t *packData, void **data, size_t count 
         __msgpack_pack_string( &pk, WEBCFG_DB_PARAMETERS.name, WEBCFG_DB_PARAMETERS.length );
 	msgpack_pack_array( &pk, count );
         
-	printf("The pack count is %ld\n",count);
+	printf("The pack count is %zu\n",count);
     
     webconfig_db_data_t *temp = packData;
        
